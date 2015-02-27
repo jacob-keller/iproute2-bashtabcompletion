@@ -1,24 +1,13 @@
 -Version
-
-ip utility, iproute2-ss100519
-
-################################
-
-
-Usage: ip [ OPTIONS ] OBJECT { COMMAND | help }
-       ip [ -force ] -batch filename
-where  OBJECT := { link | addr | addrlabel | route | rule | neigh | ntable | tunnel | tuntap | maddr | mroute | monitor | xfrm }
-       OPTIONS := { -V[ersion] | -s[tatistics] | -d[etails] | -r[esolve] | -f[amily] { inet | inet6 | ipx | dnet | link } |
-                    -o[neline] | -t[imestamp] | -b[atch] [filename] |
-                    -rc[vbuf] [size]}
+ip utility, iproute2-ss140804
 
 ################################
-
-
 Usage: ip [ OPTIONS ] OBJECT { COMMAND | help }
        ip [ -force ] -batch filename
-where  OBJECT := { link | addr | addrlabel | route | rule | neigh | ntable | tunnel | tuntap | maddr | mroute | monitor | xfrm }
-       OPTIONS := { -V[ersion] | -s[tatistics] | -d[etails] | -r[esolve] | -f[amily] { inet | inet6 | ipx | dnet | link } |
+where  OBJECT := { link | addr | addrlabel | route | rule | neigh | ntable | tunnel | tuntap | maddr | mroute | mrule | monitor | xfrm | netns | l2tp | tcp_metrics | token | netconf }
+       OPTIONS := { -V[ersion] | -s[tatistics] | -d[etails] | -r[esolve] | -f[amily] { inet | inet6 | ipx | dnet | bridge | link } |
+                    -4 | -6 | -I | -D | -B | -0 |
+                    -l[oops] { maximum-addr-flush-attempts } |
                     -o[neline] | -t[imestamp] | -b[atch] [filename] |
                     -rc[vbuf] [size]}
 
@@ -27,9 +16,10 @@ addr
 
 Usage: ip addr {add|change|replace} IFADDR dev STRING [ LIFETIME ]
                                                       [ CONFFLAG-LIST ]
-       ip addr del IFADDR dev STRING
-       ip addr {show|flush} [ dev STRING ] [ scope SCOPE-ID ]
-                            [ to PREFIX ] [ FLAG-LIST ] [ label PATTERN ]
+       ip addr del IFADDR dev STRING [mngtmpaddr]
+       ip addr {show|save|flush} [ dev STRING ] [ scope SCOPE-ID ]
+                            [ to PREFIX ] [ FLAG-LIST ] [ label PATTERN ] [up]
+       ip addr {showdump|restore}
 IFADDR := PREFIX | ADDR peer PREFIX
           [ broadcast ADDR ] [ anycast ADDR ]
           [ label STRING ] [ scope SCOPE-ID ]
@@ -39,7 +29,7 @@ FLAG  := [ permanent | dynamic | secondary | primary |
            tentative | deprecated | dadfailed | temporary |
            CONFFLAG-LIST ]
 CONFFLAG-LIST := [ CONFFLAG-LIST ] CONFFLAG
-CONFFLAG  := [ home | nodad ]
+CONFFLAG  := [ home | nodad | mngtmpaddr | noprefixroute ]
 LIFETIME := [ valid_lft LFT ] [ preferred_lft LFT ]
 LFT := forever | SECONDS
 
@@ -49,17 +39,45 @@ addrlabel
 Usage: ip addrlabel [ list | add | del | flush ] prefix PREFIX [ dev DEV ] [ label LABEL ]
 
 ################################
+l2tp
+
+Usage: ip l2tp add tunnel
+          remote ADDR local ADDR
+          tunnel_id ID peer_tunnel_id ID
+          [ encap { ip | udp } ]
+          [ udp_sport PORT ] [ udp_dport PORT ]
+Usage: ip l2tp add session [ name NAME ]
+          tunnel_id ID
+          session_id ID peer_session_id ID
+          [ cookie HEXSTR ] [ peer_cookie HEXSTR ]
+          [ offset OFFSET ] [ peer_offset OFFSET ]
+          [ l2spec_type L2SPEC ]
+       ip l2tp del tunnel tunnel_id ID
+       ip l2tp del session tunnel_id ID session_id ID
+       ip l2tp show tunnel [ tunnel_id ID ]
+       ip l2tp show session [ tunnel_id ID ] [ session_id ID ]
+
+Where: NAME   := STRING
+       ADDR   := { IP_ADDRESS | any }
+       PORT   := { 0..65535 }
+       ID     := { 1..4294967295 }
+       HEXSTR := { 8 or 16 hex digits (4 / 8 bytes) }
+       L2SPEC := { none | default }
+
+################################
 link
 
-Usage: ip link add link DEV [ name ] NAME
+Usage: ip link add [link DEV] [ name ] NAME
                    [ txqueuelen PACKETS ]
                    [ address LLADDR ]
                    [ broadcast LLADDR ]
-                   [ mtu MTU ]
+                   [ mtu MTU ] [index IDX ]
+                   [ numtxqueues QUEUE_COUNT ]
+                   [ numrxqueues QUEUE_COUNT ]
                    type TYPE [ ARGS ]
        ip link delete DEV type TYPE [ ARGS ]
 
-       ip link set DEVICE [ { up | down } ]
+       ip link set { dev DEVICE | group DEVGROUP } [ { up | down } ]
 	                  [ arp { on | off } ]
 	                  [ dynamic { on | off } ]
 	                  [ multicast { on | off } ]
@@ -72,52 +90,67 @@ Usage: ip link add link DEV [ name ] NAME
 	                  [ broadcast LLADDR ]
 	                  [ mtu MTU ]
 	                  [ netns PID ]
+	                  [ netns NAME ]
 			  [ alias NAME ]
 	                  [ vf NUM [ mac LLADDR ]
 				   [ vlan VLANID [ qos VLAN-QOS ] ]
 				   [ rate TXRATE ] ] 
-       ip link show [ DEVICE ]
+				   [ spoofchk { on | off} ] ] 
+				   [ state { auto | enable | disable} ] ]
+			  [ master DEVICE ]
+			  [ nomaster ]
+       ip link show [ DEVICE | group GROUP ] [up]
 
-TYPE := { vlan | veth | vcan | dummy | ifb | macvlan | can }
-
-################################
-link set type can
-
-Usage: ip link set DEVICE type can
-	[ bitrate BITRATE [ sample-point SAMPLE-POINT] ] | 
-	[ tq TQ prop-seg PROP_SEG phase-seg1 PHASE-SEG1
- 	  phase-seg2 PHASE-SEG2 [ sjw SJW ] ]
-
-	[ loopback { on | off } ]
-	[ listen-only { on | off } ]
-	[ triple-sampling { on | off } ]
-	[ one-shot { on | off } ]
-	[ berr-reporting { on | off } ]
-
-	[ restart-ms TIME-MS ]
-	[ restart ]
-
-	Where: BITRATE       := { 1..1000000 }
-	       SAMPLE-POINT  := { 0.000..0.999 }
-	       TQ            := { NUMBER }
-	       PROP-SEG      := { 1..8 }
-	       PHASE-SEG1    := { 1..8 }
-	       PHASE-SEG2    := { 1..8 }
-	       SJW           := { 1..4 }
-	       RESTART-MS    := { 0 | NUMBER }
+TYPE := { vlan | veth | vcan | dummy | ifb | macvlan | macvtap | bridge | bond | ipoib | ip6tnl | ipip | sit | vxlan | gre | gretap | ip6gre | ip6gretap | vti | nlmon }
 
 ################################
-link set type dummy
+link add type bond help
 
-Usage: ip link add link DEV [ name ] NAME
+bond: unknown command "help"?
+Usage: ... bond [ mode BONDMODE ] [ active_slave SLAVE_DEV ]
+                [ clear_active_slave ] [ miimon MIIMON ]
+                [ updelay UPDELAY ] [ downdelay DOWNDELAY ]
+                [ use_carrier USE_CARRIER ]
+                [ arp_interval ARP_INTERVAL ]
+                [ arp_validate ARP_VALIDATE ]
+                [ arp_all_targets ARP_ALL_TARGETS ]
+                [ arp_ip_target [ ARP_IP_TARGET, ... ] ]
+                [ primary SLAVE_DEV ]
+                [ primary_reselect PRIMARY_RESELECT ]
+                [ fail_over_mac FAIL_OVER_MAC ]
+                [ xmit_hash_policy XMIT_HASH_POLICY ]
+                [ resend_igmp RESEND_IGMP ]
+                [ num_grat_arp|num_unsol_na NUM_GRAT_ARP|NUM_UNSOL_NA ]
+                [ all_slaves_active ALL_SLAVES_ACTIVE ]
+                [ min_links MIN_LINKS ]
+                [ lp_interval LP_INTERVAL ]
+                [ packets_per_slave PACKETS_PER_SLAVE ]
+                [ lacp_rate LACP_RATE ]
+                [ ad_select AD_SELECT ]
+
+BONDMODE := balance-rr|active-backup|balance-xor|broadcast|802.3ad|balance-tlb|balance-alb
+ARP_VALIDATE := none|active|backup|all
+ARP_ALL_TARGETS := any|all
+PRIMARY_RESELECT := always|better|failure
+FAIL_OVER_MAC := none|active|follow
+XMIT_HASH_POLICY := layer2|layer2+3|layer3+4
+LACP_RATE := slow|fast
+AD_SELECT := stable|bandwidth|count
+
+################################
+link add type bridge help
+
+Usage: ip link add [link DEV] [ name ] NAME
                    [ txqueuelen PACKETS ]
                    [ address LLADDR ]
                    [ broadcast LLADDR ]
-                   [ mtu MTU ]
+                   [ mtu MTU ] [index IDX ]
+                   [ numtxqueues QUEUE_COUNT ]
+                   [ numrxqueues QUEUE_COUNT ]
                    type TYPE [ ARGS ]
        ip link delete DEV type TYPE [ ARGS ]
 
-       ip link set DEVICE [ { up | down } ]
+       ip link set { dev DEVICE | group DEVGROUP } [ { up | down } ]
 	                  [ arp { on | off } ]
 	                  [ dynamic { on | off } ]
 	                  [ multicast { on | off } ]
@@ -130,26 +163,33 @@ Usage: ip link add link DEV [ name ] NAME
 	                  [ broadcast LLADDR ]
 	                  [ mtu MTU ]
 	                  [ netns PID ]
+	                  [ netns NAME ]
 			  [ alias NAME ]
 	                  [ vf NUM [ mac LLADDR ]
 				   [ vlan VLANID [ qos VLAN-QOS ] ]
 				   [ rate TXRATE ] ] 
-       ip link show [ DEVICE ]
+				   [ spoofchk { on | off} ] ] 
+				   [ state { auto | enable | disable} ] ]
+			  [ master DEVICE ]
+			  [ nomaster ]
+       ip link show [ DEVICE | group GROUP ] [up]
 
-TYPE := { vlan | veth | vcan | dummy | ifb | macvlan | can }
+TYPE := { vlan | veth | vcan | dummy | ifb | macvlan | macvtap | bridge | bond | ipoib | ip6tnl | ipip | sit | vxlan | gre | gretap | ip6gre | ip6gretap | vti | nlmon }
 
 ################################
-link set type ifb
+link add type dummy help
 
-Usage: ip link add link DEV [ name ] NAME
+Usage: ip link add [link DEV] [ name ] NAME
                    [ txqueuelen PACKETS ]
                    [ address LLADDR ]
                    [ broadcast LLADDR ]
-                   [ mtu MTU ]
+                   [ mtu MTU ] [index IDX ]
+                   [ numtxqueues QUEUE_COUNT ]
+                   [ numrxqueues QUEUE_COUNT ]
                    type TYPE [ ARGS ]
        ip link delete DEV type TYPE [ ARGS ]
 
-       ip link set DEVICE [ { up | down } ]
+       ip link set { dev DEVICE | group DEVGROUP } [ { up | down } ]
 	                  [ arp { on | off } ]
 	                  [ dynamic { on | off } ]
 	                  [ multicast { on | off } ]
@@ -162,31 +202,61 @@ Usage: ip link add link DEV [ name ] NAME
 	                  [ broadcast LLADDR ]
 	                  [ mtu MTU ]
 	                  [ netns PID ]
+	                  [ netns NAME ]
 			  [ alias NAME ]
 	                  [ vf NUM [ mac LLADDR ]
 				   [ vlan VLANID [ qos VLAN-QOS ] ]
 				   [ rate TXRATE ] ] 
-       ip link show [ DEVICE ]
+				   [ spoofchk { on | off} ] ] 
+				   [ state { auto | enable | disable} ] ]
+			  [ master DEVICE ]
+			  [ nomaster ]
+       ip link show [ DEVICE | group GROUP ] [up]
 
-TYPE := { vlan | veth | vcan | dummy | ifb | macvlan | can }
+TYPE := { vlan | veth | vcan | dummy | ifb | macvlan | macvtap | bridge | bond | ipoib | ip6tnl | ipip | sit | vxlan | gre | gretap | ip6gre | ip6gretap | vti | nlmon }
 
 ################################
-link set type macvlan
+link add type gre help
 
-Usage: ... macvlan mode { private | vepa | bridge }
+Usage: ip link { add | set | change | replace | del } NAME
+          type { gre | gretap } [ remote ADDR ] [ local ADDR ]
+          [ [i|o]seq ] [ [i|o]key KEY ] [ [i|o]csum ]
+          [ ttl TTL ] [ tos TOS ] [ [no]pmtudisc ] [ dev PHYS_DEV ]
+
+Where: NAME := STRING
+       ADDR := { IP_ADDRESS | any }
+       TOS  := { NUMBER | inherit }
+       TTL  := { 1..255 | inherit }
+       KEY  := { DOTTED_QUAD | NUMBER }
 
 ################################
-link set type vcan
+link add type gretap help
 
-Usage: ip link add link DEV [ name ] NAME
+Usage: ip link { add | set | change | replace | del } NAME
+          type { gre | gretap } [ remote ADDR ] [ local ADDR ]
+          [ [i|o]seq ] [ [i|o]key KEY ] [ [i|o]csum ]
+          [ ttl TTL ] [ tos TOS ] [ [no]pmtudisc ] [ dev PHYS_DEV ]
+
+Where: NAME := STRING
+       ADDR := { IP_ADDRESS | any }
+       TOS  := { NUMBER | inherit }
+       TTL  := { 1..255 | inherit }
+       KEY  := { DOTTED_QUAD | NUMBER }
+
+################################
+link add type ifb help
+
+Usage: ip link add [link DEV] [ name ] NAME
                    [ txqueuelen PACKETS ]
                    [ address LLADDR ]
                    [ broadcast LLADDR ]
-                   [ mtu MTU ]
+                   [ mtu MTU ] [index IDX ]
+                   [ numtxqueues QUEUE_COUNT ]
+                   [ numrxqueues QUEUE_COUNT ]
                    type TYPE [ ARGS ]
        ip link delete DEV type TYPE [ ARGS ]
 
-       ip link set DEVICE [ { up | down } ]
+       ip link set { dev DEVICE | group DEVGROUP } [ { up | down } ]
 	                  [ arp { on | off } ]
 	                  [ dynamic { on | off } ]
 	                  [ multicast { on | off } ]
@@ -199,32 +269,240 @@ Usage: ip link add link DEV [ name ] NAME
 	                  [ broadcast LLADDR ]
 	                  [ mtu MTU ]
 	                  [ netns PID ]
+	                  [ netns NAME ]
 			  [ alias NAME ]
 	                  [ vf NUM [ mac LLADDR ]
 				   [ vlan VLANID [ qos VLAN-QOS ] ]
 				   [ rate TXRATE ] ] 
-       ip link show [ DEVICE ]
+				   [ spoofchk { on | off} ] ] 
+				   [ state { auto | enable | disable} ] ]
+			  [ master DEVICE ]
+			  [ nomaster ]
+       ip link show [ DEVICE | group GROUP ] [up]
 
-TYPE := { vlan | veth | vcan | dummy | ifb | macvlan | can }
+TYPE := { vlan | veth | vcan | dummy | ifb | macvlan | macvtap | bridge | bond | ipoib | ip6tnl | ipip | sit | vxlan | gre | gretap | ip6gre | ip6gretap | vti | nlmon }
 
 ################################
-link set type veth
+link add type ip6gre help
+
+Usage: ip link { add | set | change | replace | del } NAME
+          type { ip6gre | ip6gretap } [ remote ADDR ] [ local ADDR ]
+          [ [i|o]seq ] [ [i|o]key KEY ] [ [i|o]csum ]
+          [ hoplimit TTL ] [ encaplimit ELIM ]
+          [ tclass TCLASS ] [ flowlabel FLOWLABEL ]
+          [ dscp inherit ] [ dev PHYS_DEV ]
+
+Where: NAME      := STRING
+       ADDR      := IPV6_ADDRESS
+       TTL       := { 0..255 } (default=64)
+       KEY       := { DOTTED_QUAD | NUMBER }
+       ELIM      := { none | 0..255 }(default=4)
+       TCLASS    := { 0x0..0xff | inherit }
+       FLOWLABEL := { 0x0..0xfffff | inherit }
+
+################################
+link add type ip6gretap help
+
+Usage: ip link { add | set | change | replace | del } NAME
+          type { ip6gre | ip6gretap } [ remote ADDR ] [ local ADDR ]
+          [ [i|o]seq ] [ [i|o]key KEY ] [ [i|o]csum ]
+          [ hoplimit TTL ] [ encaplimit ELIM ]
+          [ tclass TCLASS ] [ flowlabel FLOWLABEL ]
+          [ dscp inherit ] [ dev PHYS_DEV ]
+
+Where: NAME      := STRING
+       ADDR      := IPV6_ADDRESS
+       TTL       := { 0..255 } (default=64)
+       KEY       := { DOTTED_QUAD | NUMBER }
+       ELIM      := { none | 0..255 }(default=4)
+       TCLASS    := { 0x0..0xff | inherit }
+       FLOWLABEL := { 0x0..0xfffff | inherit }
+
+################################
+link add type ip6tnl help
+
+Usage: ip link { add | set | change | replace | del } NAME
+          [ mode { ip6ip6 | ipip6 | any } ]
+          type ip6tnl [ remote ADDR ] [ local ADDR ]
+          [ dev PHYS_DEV ] [ encaplimit ELIM ]
+          [ hoplimit HLIM ] [ tclass TCLASS ] [ flowlabel FLOWLABEL ]
+          [ dscp inherit ] [ fwmark inherit ]
+
+Where: NAME      := STRING
+       ADDR      := IPV6_ADDRESS
+       ELIM      := { none | 0..255 }(default=4)
+       HLIM      := 0..255 (default=64)
+       TCLASS    := { 0x0..0xff | inherit }
+       FLOWLABEL := { 0x0..0xfffff | inherit }
+
+################################
+link add type ipip help
+
+Usage: ip link { add | set | change | replace | del } NAME
+          type { ipip | sit } [ remote ADDR ] [ local ADDR ]
+          [ ttl TTL ] [ tos TOS ] [ [no]pmtudisc ] [ dev PHYS_DEV ]
+          [ 6rd-prefix ADDR ] [ 6rd-relay_prefix ADDR ] [ 6rd-reset ]
+
+Where: NAME := STRING
+       ADDR := { IP_ADDRESS | any }
+       TOS  := { NUMBER | inherit }
+       TTL  := { 1..255 | inherit }
+
+################################
+link add type ipoib help
+
+Usage: ... ipoib [pkey PKEY] [mode {datagram | connected}][umcast {0|1}]
+
+PKEY  := 0x8001-0xffff
+
+################################
+link add type macvlan help
+
+Usage: ... macvlan mode { private | vepa | bridge | passthru }
+
+################################
+link add type macvtap help
+
+Usage: ... macvtap mode { private | vepa | bridge | passthru }
+
+################################
+link add type nlmon help
+
+Usage: ip link add [link DEV] [ name ] NAME
+                   [ txqueuelen PACKETS ]
+                   [ address LLADDR ]
+                   [ broadcast LLADDR ]
+                   [ mtu MTU ] [index IDX ]
+                   [ numtxqueues QUEUE_COUNT ]
+                   [ numrxqueues QUEUE_COUNT ]
+                   type TYPE [ ARGS ]
+       ip link delete DEV type TYPE [ ARGS ]
+
+       ip link set { dev DEVICE | group DEVGROUP } [ { up | down } ]
+	                  [ arp { on | off } ]
+	                  [ dynamic { on | off } ]
+	                  [ multicast { on | off } ]
+	                  [ allmulticast { on | off } ]
+	                  [ promisc { on | off } ]
+	                  [ trailers { on | off } ]
+	                  [ txqueuelen PACKETS ]
+	                  [ name NEWNAME ]
+	                  [ address LLADDR ]
+	                  [ broadcast LLADDR ]
+	                  [ mtu MTU ]
+	                  [ netns PID ]
+	                  [ netns NAME ]
+			  [ alias NAME ]
+	                  [ vf NUM [ mac LLADDR ]
+				   [ vlan VLANID [ qos VLAN-QOS ] ]
+				   [ rate TXRATE ] ] 
+				   [ spoofchk { on | off} ] ] 
+				   [ state { auto | enable | disable} ] ]
+			  [ master DEVICE ]
+			  [ nomaster ]
+       ip link show [ DEVICE | group GROUP ] [up]
+
+TYPE := { vlan | veth | vcan | dummy | ifb | macvlan | macvtap | bridge | bond | ipoib | ip6tnl | ipip | sit | vxlan | gre | gretap | ip6gre | ip6gretap | vti | nlmon }
+
+################################
+link add type sit help
+
+Usage: ip link { add | set | change | replace | del } NAME
+          type { ipip | sit } [ remote ADDR ] [ local ADDR ]
+          [ ttl TTL ] [ tos TOS ] [ [no]pmtudisc ] [ dev PHYS_DEV ]
+          [ 6rd-prefix ADDR ] [ 6rd-relay_prefix ADDR ] [ 6rd-reset ]
+          [ mode { ip6ip | ipip | any } ]
+          [ isatap ]
+
+Where: NAME := STRING
+       ADDR := { IP_ADDRESS | any }
+       TOS  := { NUMBER | inherit }
+       TTL  := { 1..255 | inherit }
+
+################################
+link add type vcan help
+
+Usage: ip link add [link DEV] [ name ] NAME
+                   [ txqueuelen PACKETS ]
+                   [ address LLADDR ]
+                   [ broadcast LLADDR ]
+                   [ mtu MTU ] [index IDX ]
+                   [ numtxqueues QUEUE_COUNT ]
+                   [ numrxqueues QUEUE_COUNT ]
+                   type TYPE [ ARGS ]
+       ip link delete DEV type TYPE [ ARGS ]
+
+       ip link set { dev DEVICE | group DEVGROUP } [ { up | down } ]
+	                  [ arp { on | off } ]
+	                  [ dynamic { on | off } ]
+	                  [ multicast { on | off } ]
+	                  [ allmulticast { on | off } ]
+	                  [ promisc { on | off } ]
+	                  [ trailers { on | off } ]
+	                  [ txqueuelen PACKETS ]
+	                  [ name NEWNAME ]
+	                  [ address LLADDR ]
+	                  [ broadcast LLADDR ]
+	                  [ mtu MTU ]
+	                  [ netns PID ]
+	                  [ netns NAME ]
+			  [ alias NAME ]
+	                  [ vf NUM [ mac LLADDR ]
+				   [ vlan VLANID [ qos VLAN-QOS ] ]
+				   [ rate TXRATE ] ] 
+				   [ spoofchk { on | off} ] ] 
+				   [ state { auto | enable | disable} ] ]
+			  [ master DEVICE ]
+			  [ nomaster ]
+       ip link show [ DEVICE | group GROUP ] [up]
+
+TYPE := { vlan | veth | vcan | dummy | ifb | macvlan | macvtap | bridge | bond | ipoib | ip6tnl | ipip | sit | vxlan | gre | gretap | ip6gre | ip6gretap | vti | nlmon }
+
+################################
+link add type veth help
 
 Usage: ip link <options> type veth [peer <options>]
 To get <options> type 'ip link add help'
 
 ################################
-link set type vlan
+link add type vlan help
 
-Usage: ... vlan id VLANID [ FLAG-LIST ]
-                          [ ingress-qos-map QOS-MAP ] [ egress-qos-map QOS-MAP ]
+Usage: ... vlan [ protocol VLANPROTO ] id VLANID                [ FLAG-LIST ]
+                [ ingress-qos-map QOS-MAP ] [ egress-qos-map QOS-MAP ]
 
+VLANPROTO: [ 802.1Q / 802.1ad ]
 VLANID := 0-4095
 FLAG-LIST := [ FLAG-LIST ] FLAG
-FLAG := [ reorder_hdr { on | off } ] [ gvrp { on | off } ]
+FLAG := [ reorder_hdr { on | off } ] [ gvrp { on | off } ] [ mvrp { on | off } ]
         [ loose_binding { on | off } ]
 QOS-MAP := [ QOS-MAP ] QOS-MAPPING
 QOS-MAPPING := FROM:TO
+
+################################
+link add type vti help
+
+Usage: ip link { add | set | change | replace | del } NAME
+          type { vti } [ remote ADDR ] [ local ADDR ]
+          [ [i|o]key KEY ]
+          [ dev PHYS_DEV ]
+
+Where: NAME := STRING
+       ADDR := { IP_ADDRESS }
+       KEY  := { DOTTED_QUAD | NUMBER }
+
+################################
+link add type vxlan help
+
+Usage: ... vxlan id VNI [ { group | remote } ADDR ] [ local ADDR ]
+                 [ ttl TTL ] [ tos TOS ] [ dev PHYS_DEV ]
+                 [ dstport PORT ] [ srcport MIN MAX ]
+                 [ [no]learning ] [ [no]proxy ] [ [no]rsc ]
+                 [ [no]l2miss ] [ [no]l3miss ]
+
+Where: VNI := 0-16777215
+       ADDR := { IP_ADDRESS | any }
+       TOS  := { NUMBER | inherit }
+       TTL  := { 1..255 | inherit }
 
 ################################
 maddr
@@ -235,12 +513,32 @@ Usage: ip maddr [ add | del ] MULTIADDR dev STRING
 ################################
 monitor
 
-Usage: ip monitor [ all | LISTofOBJECTS ]
+Usage: ip monitor [ all | LISTofOBJECTS ] [ FILE ] [ label ]
+LISTofOBJECTS := link | address | route | mroute | prefix |
+                 neigh | netconf
+FILE := file FILENAME
 
 ################################
 mroute
 
-Usage: ip mroute show [ PREFIX ] [ from PREFIX ] [ iif DEVICE ]
+Usage: ip mroute show [ [ to ] PREFIX ] [ from PREFIX ] [ iif DEVICE ]
+                      [ table TABLE_ID ]
+TABLE_ID := [ local | main | default | all | NUMBER ]
+
+################################
+mrule
+
+Usage: ip rule [ list | add | del | flush ] SELECTOR ACTION
+SELECTOR := [ not ] [ from PREFIX ] [ to PREFIX ] [ tos TOS ] [ fwmark FWMARK[/MASK] ]
+            [ iif STRING ] [ oif STRING ] [ pref NUMBER ]
+ACTION := [ table TABLE_ID ]
+          [ prohibit | reject | unreachable ]
+          [ realms [SRCREALM/]DSTREALM ]
+          [ goto NUMBER ]
+          SUPPRESSOR
+SUPPRESSOR := [ suppress_prefixlength NUMBER ]
+              [ suppress_ifgroup DEVGROUP ]
+TABLE_ID := [ local | main | default | NUMBER ]
 
 ################################
 neigh
@@ -248,6 +546,22 @@ neigh
 Usage: ip neigh { add | del | change | replace } { ADDR [ lladdr LLADDR ] [ nud { permanent | noarp | stale | reachable } ]
           | proxy ADDR } [ dev DEV ]
        ip neigh {show|flush} [ to PREFIX ] [ dev DEV ] [ nud STATE ]
+
+################################
+netconf
+
+Usage: ip netconf show [ dev STRING ]
+
+################################
+netns
+
+Usage: ip netns list
+       ip netns add NAME
+       ip netns delete NAME
+       ip netns identify PID
+       ip netns pids NAME
+       ip netns exec NAME cmd ...
+       ip netns monitor
 
 ################################
 ntable
@@ -266,9 +580,13 @@ PARMS := [ base_reachable MSEC ] [ retrans MSEC ] [ gc_stale MSEC ]
 route
 
 Usage: ip route { list | flush } SELECTOR
+       ip route save SELECTOR
+       ip route restore
+       ip route showdump
        ip route get ADDRESS [ from ADDRESS iif STRING ]
-                            [ oif STRING ]  [ tos TOS ]
-       ip route { add | del | change | append | replace | monitor } ROUTE
+                            [ oif STRING ] [ tos TOS ]
+                            [ mark NUMBER ]
+       ip route { add | del | change | append | replace } ROUTE
 SELECTOR := [ root PREFIX ] [ match PREFIX ] [ exact PREFIX ]
             [ table TABLE_ID ] [ proto RTPROTO ]
             [ type TYPE ] [ scope SCOPE ]
@@ -279,18 +597,19 @@ NODE_SPEC := [ TYPE ] PREFIX [ tos TOS ]
 INFO_SPEC := NH OPTIONS FLAGS [ nexthop NH ]...
 NH := [ via ADDRESS ] [ dev STRING ] [ weight NUMBER ] NHFLAGS
 OPTIONS := FLAGS [ mtu NUMBER ] [ advmss NUMBER ]
-           [ rtt TIME ] [ rttvar TIME ] [reordering NUMBER ]
+           [ rtt TIME ] [ rttvar TIME ] [ reordering NUMBER ]
            [ window NUMBER] [ cwnd NUMBER ] [ initcwnd NUMBER ]
            [ ssthresh NUMBER ] [ realms REALM ] [ src ADDRESS ]
            [ rto_min TIME ] [ hoplimit NUMBER ] [ initrwnd NUMBER ]
+           [ quickack BOOL ]
 TYPE := [ unicast | local | broadcast | multicast | throw |
           unreachable | prohibit | blackhole | nat ]
 TABLE_ID := [ local | main | default | all | NUMBER ]
 SCOPE := [ host | link | global | NUMBER ]
-MP_ALGO := { rr | drr | random | wrandom }
 NHFLAGS := [ onlink | pervasive ]
 RTPROTO := [ kernel | boot | static | NUMBER ]
-TIME := NUMBER[s|ms|us|ns|j]
+TIME := NUMBER[s|ms]
+BOOL := [1|0]
 
 ################################
 rule
@@ -302,13 +621,29 @@ ACTION := [ table TABLE_ID ]
           [ prohibit | reject | unreachable ]
           [ realms [SRCREALM/]DSTREALM ]
           [ goto NUMBER ]
+          SUPPRESSOR
+SUPPRESSOR := [ suppress_prefixlength NUMBER ]
+              [ suppress_ifgroup DEVGROUP ]
 TABLE_ID := [ local | main | default | NUMBER ]
+
+################################
+tcp_metrics
+
+Usage: ip tcp_metrics/tcpmetrics { COMMAND | help }
+       ip tcp_metrics { show | flush } SELECTOR
+       ip tcp_metrics delete [ address ] ADDRESS
+SELECTOR := [ [ address ] PREFIX ]
+
+################################
+token
+
+Usage: ip token [ list | set | get ] [ TOKEN ] [ dev DEV ]
 
 ################################
 tunnel
 
 Usage: ip tunnel { add | change | del | show | prl | 6rd } [ NAME ]
-          [ mode { ipip | gre | sit | isatap } ] [ remote ADDR ] [ local ADDR ]
+          [ mode { ipip | gre | sit | isatap | vti } ] [ remote ADDR ] [ local ADDR ]
           [ [i|o]seq ] [ [i|o]key KEY ] [ [i|o]csum ]
           [ prl-default ADDR ] [ prl-nodefault ADDR ] [ prl-delete ADDR ]
           [ 6rd-prefix ADDR ] [ 6rd-relay_prefix ADDR ] [ 6rd-reset ]
@@ -316,7 +651,7 @@ Usage: ip tunnel { add | change | del | show | prl | 6rd } [ NAME ]
 
 Where: NAME := STRING
        ADDR := { IP_ADDRESS | any }
-       TOS  := { NUMBER | inherit }
+       TOS  := { STRING | 00..ff | inherit | inherit/STRING | inherit/00..ff }
        TTL  := { 1..255 | inherit }
        KEY  := { DOTTED_QUAD | NUMBER }
 
@@ -325,7 +660,7 @@ tuntap
 
 Usage: ip tuntap { add | del } [ dev PHYS_DEV ] 
           [ mode { tun | tap } ] [ user USER ] [ group GROUP ]
-          [ one_queue ] [ pi ] [ vnet_hdr ]
+          [ one_queue ] [ pi ] [ vnet_hdr ] [ multi_queue ]
 
 Where: USER  := { STRING | NUMBER }
        GROUP := { STRING | NUMBER }
@@ -333,7 +668,5 @@ Where: USER  := { STRING | NUMBER }
 ################################
 xfrm
 
-Usage: ip xfrm XFRM_OBJECT { COMMAND | help }
-where  XFRM_OBJECT := { state | policy | monitor }
-
-################################
+Usage: ip xfrm XFRM-OBJECT { COMMAND | help }
+where  XFRM-OBJECT := state | policy | monitor
