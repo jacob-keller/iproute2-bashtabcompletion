@@ -1,36 +1,33 @@
-#!/bin/sh
+#!/bin/bash
 
-( printf -- '-Version\n\n'
-  ( ip help
-    ip link help ) 2>&1 |
-   sed -ne '
-            /OBJECT *:= *{/,/}/ bq;
-            /TYPE *:= *{/,/}/bl;
+OBJECTS=$(ip help 2>&1 | sed -e '/OBJECT *:= *{/,/}/!d;
+                                 s/^.*{//;
+                                 s/}.*$//' | awk 'BEGIN { RS="|" } { print $1 }' | sort -u)
 
-            d;
+LINKS=$(ip link help 2>&1 | sed -e '/TYPE *:= *{/,/}/!d;
+                                    s/^.*{//;
+                                    s/}.*$//' | awk 'BEGIN { RS="|" } { print $1 }' | sort -u)
 
-            :l;
-            s/[{|] */&link set type /g;
+(
+printf "%s\n" "-Version"
+ip -Version
+printf '\n################################\n'
 
-            :q;
-            s/.*:= *{ *//;
-            s/ *} *$//;
+ip help 2>&1
 
-            s/| */\n/g;
+for obj in $OBJECTS; do
+        printf '\n################################\n'
+        printf '%s\n\n' "$obj"
+        ip $obj help 2>&1
 
-            s/  */ /g;
-            s/^ //;
-            s/ $//;
-            p;
-        ' |
-    sort -u
-) |
-
-while read t
-do  printf '%s\n\n' "$t"
-    ip $t help
-    printf '\n################################\n'
-done 2>&1 |
+        if [ "$obj" = "link" ]; then
+                for lnk in $LINKS; do
+                        printf '\n################################\n'
+                        printf 'link add type %s help\n\n' "$lnk"
+                        ip link add type $lnk help 2>&1
+                done
+        fi
+done ) |
 
 sed -e '
         /{/ {
@@ -41,34 +38,3 @@ sed -e '
             }
             s/\n */ /g;
         }'
-
-
-exit
-    -e '
-            s/   */ /g;
-            h;
-            s/\({[^{}]*[^ }]\) *|.*/\1/;
-            Tx;
-            p;
-            g;
-            s/ *{ *[^{}]*|/ { /;
-            tr;
-            :r;
-            s/[^ ]\( *{\)/ \1/;
-            tr;
-            s/[{]/|/;
-            to;
-
-            :o;
-            h;
-            s/|\([^{}]*[^ }]\) *|.*/| \1/;
-            p;
-            Tx;
-            g;
-            s/|[^{}|]*}/|/;
-            to;
-
-            :x;
-            n;
-        }
-    '
